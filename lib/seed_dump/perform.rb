@@ -28,10 +28,15 @@ module SeedDump
       @opts['file']    = env['FILE'] || "#{Rails.root}/db/seeds.rb"
       @opts['append']  = (env['APPEND'].true? && File.exists?(@opts['file']) )
       @ar_options      = env['LIMIT'].to_i > 0 ? { :limit => env['LIMIT'].to_i } : {}
+      if(env['ORDER_BY'])
+        @ar_options[:order]=env['ORDER_BY']
+      end
+
       @indent          = " " * (env['INDENT'].nil? ? 2 : env['INDENT'].to_i)
       @opts['models']  = @opts['models'].split(',').collect {|x| x.underscore.singularize.camelize }
       @opts['schema']  = env['PG_SCHEMA']
       @opts['model_dir']  = env['MODEL_DIR'] || @model_dir
+      @opts['max_records_per_insert'] = env['MAX_RECORDS_PER_INSERT'].to_i ? env['MAX_RECORDS_PER_INSERT'].to_i : 100
     end
 
     def loadModels
@@ -80,11 +85,17 @@ module SeedDump
       create_hash = ""
       options = ''
       rows = []
+      result = ""
       arr = []
       arr = model.find(:all, @ar_options) unless @opts['no-data']
-      arr = arr.empty? ? [model.new] : arr 
+      arr = arr.empty? ? [model.new] : arr
 
-      arr.each_with_index { |r,i| 
+      if @opts['without_protection']
+        options = ', :without_protection => true '
+      end
+
+      index=0
+      arr.each_with_index { |r,i|
         attr_s = [];
         r.attributes.each do |k,v|
           if ((model.attr_accessible[:default].include? k) || @opts['without_protection'] || @opts['with_id'])
@@ -92,14 +103,21 @@ module SeedDump
             @last_record.push k 
           end
         end
-        rows.push "#{@indent}{ " << attr_s.join(', ') << " }"
-      } 
 
-      if @opts['without_protection']
-        options = ', :without_protection => true '
+          rows.push "#{@indent}{ " << attr_s.join(', ') << " }"
+
+        if(index% @opts['max_records_per_insert'] == 1)
+          result << "\n#{model}.create([\n" << rows.join(",\n") << "\n]#{options})\n"
+          rows =[]
+        end
+        index=index+1
+      }
+
+      if(index% @opts['max_records_per_insert'] != 1)
+        result << "\n#{model}.create([\n" << rows.join(",\n") << "\n]#{options})\n"
       end
 
-      "\n#{model}.create([\n" << rows.join(",\n") << "\n]#{options})\n"
+      result
     end
 
     def dumpModels
