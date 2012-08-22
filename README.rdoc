@@ -94,5 +94,10 @@ WITHOUT_PROTECTION:
 MODEL_DIR:
  Specify an alternative model dir
 
+ORDER_BY:
+ Let to specify an order criteria to extract data from model. It is useful in conjunction with MAX_RECORDS_PER_INSERT
+
+MAX_RECORDS_FOR_INSERT:
+ Let specify the size of each insert, useful when memory exahusted error arise.
 
 Copyright (c) 2010 Rob Halff, released under the MIT license
